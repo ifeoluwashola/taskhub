@@ -14,15 +14,12 @@ WORKDIR /app
 
 RUN addgroup -g 1001 -S nodejs && adduser -u 1001 -S nextjs -G nodejs
 
-COPY package*.json ./
-RUN npm install --omit=dev
-
-COPY --from=build --chown=nextjs:nodejs /app/.next ./.next
+COPY --from=build --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=build --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=build --chown=nextjs:nodejs /app/public ./public
-COPY --from=build --chown=nextjs:nodejs /app/next.config.ts ./next.config.ts
 
 USER nextjs
 
 EXPOSE 3000
 
-CMD ["npm", "start"]
+CMD ["node", "server.js"]
