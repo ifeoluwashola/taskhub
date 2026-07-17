@@ -15,13 +15,12 @@ import { SearchModule } from './search/search.module';
     ConfigModule.forRoot({
       isGlobal: true,
     }),
-    MongooseModule.forRootAsync({
-      imports: [ConfigModule],
-      useFactory: async (configService: ConfigService) => ({
-        uri: configService.get<string>('MONGODB_URI', 'mongodb://localhost:27017/kybern-taskhub'),
-      }),
-      inject: [ConfigService],
-    }),
+   MongooseModule.forRootAsync({
+  inject: [ConfigService],
+  useFactory: (configService: ConfigService) => ({
+    uri: configService.get<string>('MONGODB_URI'),
+  }),
+}),
     UsersModule,
     AuthModule,
     ProjectsModule,
