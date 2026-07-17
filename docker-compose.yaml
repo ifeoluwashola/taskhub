@@ -1,0 +1,68 @@
+services:
+  #DATABASE SERVICE 
+  mongodb:
+    image: mongo:8.0
+    container_name: taskhub-mongodb
+    restart: always
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: MONGO_ROOT_USER
+      MONGO_INITDB_ROOT_PASSWORD: MONGO_ROOT_PASSWORD
+      MONGO_INITDB_DATABASE: taskhub
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - taskhub-net
+    
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  #BACKEND SERVICE 
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: taskhub-backend
+    restart: always
+    ports:
+      - "3001:3001"
+    environment:
+      PORT: 3001
+      NODE_ENV: production
+      
+      MONGO_URI: mongodb://${MONGO_ROOT_USER}:${MONGO_ROOT_PASSWORD}@mongodb:27017/taskhub?authSource=admin
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - taskhub-net
+
+  #FRONTEND SERVICE
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: taskhub-frontend
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      PORT: 3000
+      NODE_ENV: production
+      NEXT_PUBLIC_API_URL: http://localhost:3001
+    depends_on:
+      - backend
+    networks:
+      - taskhub-net
+
+volumes:
+  mongodb_data:
+
+networks:
+  taskhub-net:
+    driver: bridge
