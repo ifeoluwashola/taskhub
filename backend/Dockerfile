@@ -15,7 +15,6 @@ COPY package*.json ./
 COPY tsconfig*.json ./
 COPY nest-cli.json ./
 COPY src ./src
-COPY test ./test
 RUN npm install
 RUN npm run build
 
