@@ -44,6 +44,9 @@ services:
     cap_drop:
       - ALL
 
+    ports:
+      - "3001:3000"
+
     networks:
       - taskhub
 
@@ -61,7 +64,7 @@ services:
       - backend
 
     environment:
-      NEXT_PUBLIC_API_URL: http://backend:3000
+      NEXT_PUBLIC_API_URL: http://localhost:3001
 
     ports:
       - "3000:3000"
