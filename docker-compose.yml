@@ -6,11 +6,14 @@ services:
     restart: unless-stopped
 
     environment:
-      MONGO_INITDB_ROOT_USERNAME: admin
-      MONGO_INITDB_ROOT_PASSWORD: password123
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD}
 
     volumes:
       - mongodb_data:/data/db
+
+    cap_drop:
+      - ALL
 
     networks:
       - taskhub
@@ -29,11 +32,11 @@ services:
 
     environment:
       PORT: 3000
-      MONGODB_URI: mongodb://admin:password123@mongodb:27017/taskhub?authSource=admin
-      JWT_SECRET: change-me
+      MONGODB_URI: mongodb://${MONGO_USERNAME}:${MONGO_PASSWORD}@mongodb:27017/taskhub?authSource=admin
+      JWT_SECRET: ${JWT_SECRET}
 
-    ports:
-      - "3001:3000"
+    cap_drop:
+      - ALL
 
     networks:
       - taskhub
@@ -55,6 +58,9 @@ services:
 
     ports:
       - "3000:3000"
+
+    cap_drop:
+      - ALL
 
     networks:
       - taskhub

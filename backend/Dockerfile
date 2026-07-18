@@ -15,6 +15,8 @@ FROM node:22-alpine
 
 WORKDIR /app
 
+ENV NODE_ENV=production
+
 RUN addgroup -S nestjs && adduser -S nestjs -G nestjs
 
 COPY package*.json ./
