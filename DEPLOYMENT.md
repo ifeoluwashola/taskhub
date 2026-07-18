@@ -1,25 +1,19 @@
-# DEPLOYMENT.md
+# TaskHub — Docker Deployment Documentation
 
-## TaskHub — Docker Deployment Documentation
-
-This document describes how to build, run, stop, and rebuild the containerized TaskHub application (Next.js frontend, NestJS backend, MongoDB database) using Docker and Docker Compose.
+This document describes how to build, run, stop, and manage the containerized TaskHub application (Next.js frontend, NestJS backend, MongoDB database) using Docker and Docker Compose.
 
 ---
 
 ## 1. Project Structure
 
-```
+```text
 taskhub-hub/
 ├── backend/
 │   ├── Dockerfile
-│   ├── .dockerignore
-│   ├── .env
-│   └── ...
+│   └── .dockerignore
 ├── frontend/
 │   ├── Dockerfile
-│   ├── .dockerignore
-│   ├── .env
-│   └── ...
+│   └── .dockerignore
 ├── docker-compose.yaml
 └── .env
 ```
@@ -30,75 +24,78 @@ taskhub-hub/
 
 - Docker Engine and Docker Compose installed
 - Git (to clone the repository)
-- A `.env` file at the project root, and one inside each of `backend/` and `frontend/` (see section 6)
+- A single, fully populated `.env` file at the project root directory (containing database secrets, app ports, and the `IMAGE_VERSION` tag)
 
 ---
 
-## 3. How to Build the Images
+## 3. How to Build and Tag Images
 
-To build both the frontend and backend images via Docker Compose:
+Docker Compose handles both building your code and applying your custom image tags dynamically using the `IMAGE_VERSION` variable defined in your root `.env` file.
+
+To build and tag all images cleanly from scratch (ignoring cache layers):
 
 ```bash
-docker compose build
-```
-To build the all images
-```bash
-docker compose up
+docker compose build --no-cache
 ```
 
-To build an individual service:
+To build a specific service independently:
 
 ```bash
 docker compose build backend
 docker compose build frontend
 ```
 
-To build and tag an image manually for Docker Hub (used prior to publishing):
-
-```bash
-docker build -t temigodson/taskhub-hub-backend:latest ./backend
-docker build -t temigodson/taskhub-hub-frontend:latest ./frontend
-```
-
 ---
 
 ## 4. How to Start the Application
 
-From the project root (where `docker-compose.yaml` lives):
+From the project root (where `docker-compose.yaml` lives), use the following commands:
+
+**Development / Foreground Mode:**
 
 ```bash
 docker compose up
 ```
 
-To run in detached mode (background):
+**Production / Detached Mode (runs in background):**
 
 ```bash
 docker compose up -d
 ```
 
-Once started:
+**Force a Build + Launch Sequence:**
 
-- **Frontend:** [http://localhost:3000](http://localhost:3000)
-- **Backend:** [http://localhost:3001](http://localhost:3001)
-- **MongoDB:** exposed on `localhost:27017` (internally reachable by the backend as `mongodb://mongodb:27017`)
+```bash
+docker compose up --build
+```
+
+### Active Ports
+
+Once started, services are accessible locally via these ports:
+
+| Service | Address |
+|---|---|
+| Frontend Dashboard | http://localhost:3000 |
+| Backend API Engine | http://localhost:3001 |
+| MongoDB Instance | localhost:27017 (internally resolved within the bridge network as `mongodb://taskhub-mongodb:27017`) |
 
 ---
 
 ## 5. How to Stop the Application
 
-To stop running containers without removing them:
+To stop running containers safely without losing state or removing network definitions:
 
 ```bash
 docker compose stop
 ```
 
-To stop and remove containers, networks, but keep volumes (MongoDB data persists):
+To stop containers and tear down virtual networks, but preserve your database records:
 
 ```bash
 docker compose down
 ```
 
-To stop and remove containers **and** volumes (this will delete all MongoDB data):
+To wipe the environment completely, including permanently deleting all MongoDB data:
 
 ```bash
 docker compose down -v
@@ -106,85 +103,50 @@ docker compose down -v
 
 ---
 
-## 6. How to Rebuild the Containers
+## 6. Environment Architecture
 
-If application code or a Dockerfile changes, rebuild before starting again:
+All configuration parameters are consolidated within a single root-level `.env` file. This central file drives the variable substitution inside `docker-compose.yaml`, configures runtime values inside the containers, and passes build-time arguments to Next.js.
 
-```bash
-docker compose up --build
-```
-
-To force a clean rebuild with no cached layers:
-
-```bash
-docker compose build --no-cache
-docker compose up
-```
-
-To rebuild a single service:
-
-```bash
-docker compose up --build backend
-```
+> ⚠️ **Security Policy:** Under no circumstances should the `.env` file be committed to version control. It is explicitly excluded via `.gitignore` and ignored via `.dockerignore` configs.
 
 ---
 
-## 7. Environment Variables
+## 7. Docker Hub Repositories
 
-Environment variables are split across three `.env` files rather than hardcoded in any Dockerfile or `docker-compose.yaml`.
+| Service | Docker Hub Registry Repository |
+|---|---|
+| Backend | `temigodson/taskhub-hub-backend` |
+| Frontend | `temigodson/taskhub-hub-frontend` |
 
-### Root `.env`
-Used by Docker Compose to configure MongoDB and cross-service values (ports, API URL).
-
-
-### `backend/.env`
-Backend-specific configuration (not related to Mongo connection, which is injected by Compose).
-
-### `frontend/.env`
-
-> **Note:** No secrets are hardcoded in any Dockerfile. All sensitive values (Mongo credentials, JWT secret) are supplied via `.env` files, which are excluded from version control via `.gitignore` and from the Docker build context via `.dockerignore`.
-
----
-
-## 8. Docker Hub Image Links
-
-| Service  | Docker Hub Repository                                                                 |
-|----------|-----------------------------------------------------------------------------------------|
-| Backend  | [temigodson/taskhub-hub-backend](https://hub.docker.com/repository/docker/temigodson/taskhub-hub-backend)   |
-| Frontend | [temigodson/taskhub-hub-frontend](https://hub.docker.com/repository/docker/temigodson/taskhub-hub-frontend) |
-
-To pull the published images directly:
+To pull images directly from the registry using a specific tag (e.g., `v2`), update your shell environment or execute:
 
 ```bash
-docker pull temigodson/taskhub-hub-backend:latest
-docker pull temigodson/taskhub-hub-frontend:latest
+IMAGE_VERSION=v2 docker compose pull
 ```
 
 ---
 
-## 9. Assumptions Made During Deployment
+## 8. Core Deployment Principles
 
-- **MongoDB was kept as a containerized service** using the official `mongo:7-jammy` image, pulled rather than built, per the assignment's requirement not to replace or restructure the database layer.
-- **Backend port assumed to be `3001`** and **frontend port assumed to be `3000`** (Next.js default), based on standard NestJS/Next.js conventions, since no custom port configuration was specified in the original application code.
-- **MongoDB authentication** uses root credentials (`MONGO_INITDB_ROOT_USERNAME` / `MONGO_INITDB_ROOT_PASSWORD`) with `authSource=admin` in the connection string, matching the default behavior of the official Mongo image when root env vars are set.
-- **Both application images run as a non-root user** (`appuser`) inside the container, per the assignment's security requirements — this required explicit `--chown` flags on `COPY` instructions from the build stage to ensure the non-root user has read/execute access to application files.
-- **No `.env` files are committed to the repository.** They are excluded via `.gitignore`; only `.env.example`-style documentation (this file) shows the expected variable names.
-- **Persistent storage** for MongoDB is handled via a named Docker volume (`mongo-data`), so data survives `docker compose down` (but not `docker compose down -v`).
+- **Data Persistence:** Database files are mapped to a named, isolated Docker volume (`mongo-data`). Your records safely survive application code updates and basic `down` routines.
+- **Next.js Compilation Handling:** The `NEXT_PUBLIC_API_URL` variable is injected as a Docker build argument (`ARG`), ensuring it is compiled directly into the Next.js production client bundles during the build layer.
+- **Security & Least Privilege:** Both production application containers run under dedicated, unprivileged non-root accounts (`node` for frontend, `appuser` for backend) to isolate container processes from host kernel execution vulnerabilities.
+- **Dependency Integrity:** Production runtime files copy over fresh lockfile builds via `npm ci --omit=dev`. Directory ownership permissions are updated during compilation to ensure dependency layers remain readable by the active non-root application accounts.
 
 ---
 
-## 10. Verifying the Deployment
+## 9. Verifying the Deployment
 
-After running `docker compose up`, confirm all three services report as healthy/running:
+Run this command to verify that all components are up and running cleanly:
 
 ```bash
 docker compose ps
 ```
 
-Check logs for a specific service if something fails to start:
+If a service crashes or refuses to connect, review its runtime stream directly using the service log tool:
 
 ```bash
-docker compose logs backend
-docker compose logs frontend
-docker compose logs mongodb
+docker compose logs -f backend
+docker compose logs -f frontend
+docker compose logs -f mongodb
 ```

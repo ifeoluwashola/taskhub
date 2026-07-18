@@ -11,22 +11,26 @@ RUN npm run build
 
 
 # ---------- Stage 2: Runtime ----------
+# ---------- Stage 2: Runtime ----------
 FROM node:20-alpine
 
-# Create a non-root user/group to run the app
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 
 WORKDIR /app
 
-ENV NODE_ENV=production
+# Ensure our user owns the working directory before running npm install
+RUN chown appuser:appgroup /app
+
+ENV NODE_ENV=${NODE_ENV}
 
 COPY --from=builder --chown=appuser:appgroup /app/package*.json ./
+
+# Switch to your non-root user BEFORE running npm ci so the dependencies are owned by them!
+USER appuser
+
 RUN npm ci --omit=dev && npm cache clean --force
 
 COPY --from=builder --chown=appuser:appgroup /app/dist ./dist
-
-# Switch to non-root user before running the app
-USER appuser
 
 EXPOSE 3001
 
