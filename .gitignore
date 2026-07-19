@@ -1,7 +1,7 @@
 node_modules
 dist
-.env
-.env.*.local
+# #.env
+# #.env.*.local
 .next
 coverage
 .DS_Store
@@ -38,7 +38,7 @@ yarn-error.log*
 .pnpm-debug.log*
 
 # env files (can opt-in for committing if needed)
-.env*
+# #.env*
 
 # vercel
 .vercel
