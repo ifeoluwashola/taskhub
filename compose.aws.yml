@@ -1,6 +1,6 @@
 services:
   mongodb:
-    image: mongo:8
+    image: mongo:6
     container_name: taskhub-mongodb
     restart: unless-stopped
 
@@ -33,7 +33,7 @@ services:
       - taskhub-network
 
   frontend:
-    image: emex2275/taskhub-frontend:v1
+    image: emex2275/taskhub-frontend:v3
     container_name: taskhub-frontend
     restart: unless-stopped
 
