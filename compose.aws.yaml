@@ -12,7 +12,7 @@ services:
         image: rucini/taskhub:backend-vs1
         container_name: taskhub-backend
         env_file:
-           - ./backend/.env2
+           - ./backend/.env
         ports:
             - "5000:5000"
         restart: always
