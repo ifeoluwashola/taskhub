@@ -1,190 +1,156 @@
-# DEPLOYMENT.md
+# TaskHub — AWS EC2 Deployment Documentation
 
-## TaskHub — Docker Deployment Documentation
+## Overview
 
-This document describes how to build, run, stop, and rebuild the containerized TaskHub application (Next.js frontend, NestJS backend, MongoDB database) using Docker and Docker Compose.
-
----
-
-## 1. Project Structure
-
-```
-taskhub-hub/
-├── backend/
-│   ├── Dockerfile
-│   ├── .dockerignore
-│   ├── .env
-│   └── ...
-├── frontend/
-│   ├── Dockerfile
-│   ├── .dockerignore
-│   ├── .env
-│   └── ...
-├── docker-compose.yaml
-└── .env
-```
+This document describes the deployment of the TaskHub full-stack application
+(Next.js frontend, NestJS backend, MongoDB) to a single AWS EC2 instance using
+Docker Compose and pre-built Docker Hub images.
 
 ---
 
-## 2. Prerequisites
+## AWS Infrastructure
 
-- Docker Engine and Docker Compose installed
-- Git (to clone the repository)
-- A `.env` file at the project root, and one inside each of `backend/` and `frontend/` (see section 6)
-
----
-
-## 3. How to Build the Images
-
-To build both the frontend and backend images via Docker Compose:
-
-```bash
-docker compose build
-```
-To build the all images
-```bash
-docker compose up
-```
-
-To build an individual service:
-
-```bash
-docker compose build backend
-docker compose build frontend
-```
-
-To build and tag an image manually for Docker Hub (used prior to publishing):
-
-```bash
-docker build -t temigodson/taskhub-hub-backend:latest ./backend
-docker build -t temigodson/taskhub-hub-frontend:latest ./frontend
-```
+| Resource | Value |
+|---|---|
+| AWS Region | us-east-1 |
+| Availability Zone | us-east-1a |
+| VPC Name | kybern-taskhub-vpc |
+| VPC CIDR Block | 10.0.0.0/16 |
+| Public Subnet Name | kybern-taskhub-public-subnet |
+| Public Subnet CIDR Block | 10.0.0.0/24 |
+| Internet Gateway | kybern-taskhub-igw |
+| Public Route Table | kybern-taskhub-RT |
+| Route Table Rule | 0.0.0.0/0 → Internet Gateway |
+| Security Group | kybern-taskhub-SG |
+| EC2 Instance Name | kybern-taskhub-server |
+| EC2 Operating System | Ubuntu (Ubuntu Server, latest LTS) |
+| EC2 Public IPv4 Address | 44.202.206.132 |
 
 ---
 
-## 4. How to Start the Application
+## Security Group Rules
 
-From the project root (where `docker-compose.yaml` lives):
-
-```bash
-docker compose up
-```
-
-To run in detached mode (background):
-
-```bash
-docker compose up -d
-```
-
-Once started:
-
-- **Frontend:** [http://localhost:3000](http://localhost:3000)
-- **Backend:** [http://localhost:3001](http://localhost:3001)
-- **MongoDB:** exposed on `localhost:27017` (internally reachable by the backend as `mongodb://mongodb:27017`)
+| Type | Protocol | Port | Source | Purpose |
+|---|---|---|---|---|
+| SSH | TCP | 22 | My public IP only (x.x.x.x/32) | Admin access |
+| Custom TCP | TCP | 3000 | 0.0.0.0/0 | Frontend (Next.js) public access |
+| Custom TCP | TCP | 3001 | 0.0.0.0/0 | Backend (NestJS) public access |
+| — | — | 27017 | Not exposed | MongoDB — internal Docker network only |
 
 ---
 
-## 5. How to Stop the Application
+## Docker Hub Images
 
-To stop running containers without removing them:
+| Service | Image | Tag |
+|---|---|---|
+| Backend | `temigodson/taskhub-hub-backend` | `v2` |
+| Frontend | `temigodson/taskhub-hub-frontend` | `v2` |
 
-```bash
-docker compose stop
+---
+
+## Environment Variables
+
+The following environment variables are required (see `.env.example` for
+placeholder values — real values are not committed to the repository):
+
+- `IMAGE_VERSION`
+- `MONGO_ROOT_USER`
+- `MONGO_ROOT_PASSWORD`
+- `MONGO_DB_NAME`
+- `MONGO_PORT`
+- `BACKEND_PORT`
+- `FRONTEND_PORT`
+- `NEXT_PUBLIC_API_URL` — set to `http://<EC2_PUBLIC_IP>:3001`
+- `NODE_ENV`
+- `JWT_SECRET`
+- `JWT_EXPIRES_IN`
+- `CORS_ORIGIN` — set to `http://<EC2_PUBLIC_IP>:3000`
+
+The backend connects to MongoDB using the Docker Compose service name
+(`mongodb`), not `localhost`:
+
 ```
-
-To stop and remove containers, networks, but keep volumes (MongoDB data persists):
-
-```bash
-docker compose down
-```
-
-To stop and remove containers **and** volumes (this will delete all MongoDB data):
-
-```bash
-docker compose down -v
+MONGODB_URI=mongodb://<user>:<password>@mongodb:27017/<db>?authSource=admin
 ```
 
 ---
 
-## 6. How to Rebuild the Containers
-
-If application code or a Dockerfile changes, rebuild before starting again:
+## Docker Installation Steps (on EC2)
 
 ```bash
-docker compose up --build
-```
+# Update packages
+sudo apt update && sudo apt upgrade -y
 
-To force a clean rebuild with no cached layers:
+# Install Docker Engine
+curl -fsSL https://get.docker.com -o get-docker.sh
+sudo sh get-docker.sh
 
-```bash
-docker compose build --no-cache
-docker compose up
-```
+# Add current user to the docker group
+sudo usermod -aG docker $USER
+newgrp docker
 
-To rebuild a single service:
-
-```bash
-docker compose up --build backend
-```
-
----
-
-## 7. Environment Variables
-
-Environment variables are split across three `.env` files rather than hardcoded in any Dockerfile or `docker-compose.yaml`.
-
-### Root `.env`
-Used by Docker Compose to configure MongoDB and cross-service values (ports, API URL).
-
-
-### `backend/.env`
-Backend-specific configuration (not related to Mongo connection, which is injected by Compose).
-
-### `frontend/.env`
-
-> **Note:** No secrets are hardcoded in any Dockerfile. All sensitive values (Mongo credentials, JWT secret) are supplied via `.env` files, which are excluded from version control via `.gitignore` and from the Docker build context via `.dockerignore`.
-
----
-
-## 8. Docker Hub Image Links
-
-| Service  | Docker Hub Repository                                                                 |
-|----------|-----------------------------------------------------------------------------------------|
-| Backend  | [temigodson/taskhub-hub-backend](https://hub.docker.com/repository/docker/temigodson/taskhub-hub-backend)   |
-| Frontend | [temigodson/taskhub-hub-frontend](https://hub.docker.com/repository/docker/temigodson/taskhub-hub-frontend) |
-
-To pull the published images directly:
-
-```bash
-docker pull temigodson/taskhub-hub-backend:latest
-docker pull temigodson/taskhub-hub-frontend:latest
+# Verify installation
+docker --version
+docker compose version
 ```
 
 ---
 
-## 9. Assumptions Made During Deployment
+## Deployment Commands
 
-- **MongoDB was kept as a containerized service** using the official `mongo:7-jammy` image, pulled rather than built, per the assignment's requirement not to replace or restructure the database layer.
-- **Backend port assumed to be `3001`** and **frontend port assumed to be `3000`** (Next.js default), based on standard NestJS/Next.js conventions, since no custom port configuration was specified in the original application code.
-- **MongoDB authentication** uses root credentials (`MONGO_INITDB_ROOT_USERNAME` / `MONGO_INITDB_ROOT_PASSWORD`) with `authSource=admin` in the connection string, matching the default behavior of the official Mongo image when root env vars are set.
-- **Both application images run as a non-root user** (`appuser`) inside the container, per the assignment's security requirements — this required explicit `--chown` flags on `COPY` instructions from the build stage to ensure the non-root user has read/execute access to application files.
-- **No `.env` files are committed to the repository.** They are excluded via `.gitignore`; only `.env.example`-style documentation (this file) shows the expected variable names.
-- **Persistent storage** for MongoDB is handled via a named Docker volume (`mongo-data`), so data survives `docker compose down` (but not `docker compose down -v`).
+```bash
+# Clone the repository / navigate to project directory
+cd ~/taskhub-hub
+
+# Configure environment variables
+nano .env
+
+# Pull the latest images from Docker Hub
+docker compose -f docker-compose.yaml pull
+
+# Start the application
+docker compose -f docker-compose.yaml up -d
+
+# Verify containers are running
+docker compose -f docker-compose.yaml ps
+
+# Review logs
+docker compose -f docker-compose.yaml logs --tail=30
+```
 
 ---
 
-## 10. Verifying the Deployment
+## Application URL
 
-After running `docker compose up`, confirm all three services report as healthy/running:
-
-```bash
-docker compose ps
+```
+http://44.202.206.132:3000
 ```
 
-Check logs for a specific service if something fails to start:
+---
 
-```bash
-docker compose logs backend
-docker compose logs frontend
-docker compose logs mongodb
-```
+## Problems Encountered and Solutions
+
+1. **SSH open to the internet.** The Security Group initially allowed SSH
+   (port 22) from `0.0.0.0/0`. This was corrected by restricting the SSH
+   inbound rule to the deployer's public IP address only (`/32`), in line with
+   least-privilege access.
+
+2. **Frontend/backend port rules briefly swapped with the SSH restriction.**
+   While editing inbound rules, the IP restriction was momentarily applied to
+   the frontend port instead of SSH. This was caught and corrected so that SSH
+   is restricted and the application ports remain publicly accessible.
+
+---
+
+## Resource Cleanup
+
+After grading/submission, the following resources were reviewed for removal
+to avoid ongoing AWS charges:
+
+- [ ] Terminate EC2 instance (`kybern-taskhub-server`)
+- [ ] Delete unused EBS volumes
+- [ ] Delete Security Group (`kybern-taskhub-SG`)
+- [ ] Delete public route table (`kybern-taskhub-RT`)
+- [ ] Detach and delete Internet Gateway (`kybern-taskhub-igw`)
+- [ ] Delete public subnet (`kybern-taskhub-public-subnet`)
+- [ ] Delete custom VPC (`kybern-taskhub-vpc`) 
