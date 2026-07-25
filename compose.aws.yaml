@@ -1,0 +1,32 @@
+services:
+    frontend:
+        image: rucini/taskhub:frontend-vs1
+        container_name: taskhub-frontend
+        ports:
+            - "3001:3000"
+        restart: always    
+        depends_on:
+            - backend
+
+    backend:
+        image: rucini/taskhub:backend-vs1
+        container_name: taskhub-backend
+        env_file:
+           - ./backend/.env2
+        ports:
+            - "5000:5000"
+        restart: always
+        depends_on:
+            -  mongodb
+    
+    mongodb:
+       image: mongo:latest
+       container_name: taskhub-mongodb
+       restart: always
+       ports:
+          - "27017:27017"
+       volumes:
+          - mongo-data:/data/db
+
+volumes:
+    mongo-data:      
