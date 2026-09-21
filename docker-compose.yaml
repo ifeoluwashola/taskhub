@@ -1,0 +1,38 @@
+services:
+
+  mongo:
+    image: mongo
+    restart: always
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: mongodb
+      MONGO_INITDB_ROOT_PASSWORD: mongodbpassword
+
+    volumes:
+      - mongodb_data:/data/db
+
+  
+  backend:
+    build: 
+      context: ./backend
+      dockerfile: Dockerfile
+  
+    ports:
+      - "3001:3001"
+    depends_on:
+     - mongo
+
+    environment:
+        MONGODB_URI: mongodb://mongodb:mongodbpassword@mongo:27017/taskhub?authSource=admin
+
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3005:3000"
+    depends_on:
+      - backend
+
+volumes:
+  mongodb_data:
